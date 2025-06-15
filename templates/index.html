@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Recognition</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #06b6d4;
+            --accent: #f43f5e;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .recording {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .emotion-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .emotion-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .history-item {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(79, 70, 229, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .audio-player {
+            width: 100%;
+            margin-top: 1rem;
+            border-radius: 9999px;
+            background: #f3f4f6;
+        }
+
+        .audio-player::-webkit-media-controls-panel {
+            background: #f3f4f6;
+        }
+
+        .play-button {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        }
+
+        .play-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+        }
+
+        #waveform {
+            width: 100%;
+            height: 120px;
+            background: rgba(243, 244, 246, 0.5);
+            border-radius: 12px;
+            margin: 1rem 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .wave-bar {
+            position: absolute;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to top, var(--primary), var(--secondary));
+            border-radius: 2px;
+            transition: height 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--accent);
+            font-weight: 600;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            box-shadow: 0 4px 12px rgba(244, 63, 94, 0.1);
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background-color: rgba(79, 70, 229, 0.05);
+            transform: scale(1.02);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(100%);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--accent);
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .emotion-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.8) 100%);
+        }
+
+        .emotion-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.3s ease;
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-12">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-12">
+                <h1 class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
+                    Voice Emotion Recognition
+                </h1>
+                <p class="text-gray-600 text-lg">Speak naturally or upload a WAV file to detect emotions in your voice</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Main Recording Section -->
+                <div class="glass-card rounded-2xl p-8">
+                    <div class="text-center mb-8">
+                        <p class="text-gray-600 mb-6">Click the button below to record your voice for 5 seconds</p>
+                        <button id="recordButton" class="play-button text-white font-semibold py-4 px-8 rounded-full transition duration-300 flex items-center justify-center mx-auto">
+                            <i class="fas fa-microphone mr-3"></i>
+                            <span>Start Recording</span>
+                        </button>
+                    </div>
+                    
+                    <div class="relative my-8">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-4 bg-white text-gray-500">or</span>
+                        </div>
+                    </div>
+
+                    <div id="uploadArea" class="upload-area rounded-xl p-8 text-center cursor-pointer">
+                        <input type="file" id="fileInput" class="hidden" accept=".wav">
+                        <div class="flex flex-col items-center">
+                            <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600 text-lg mb-2">Drag and drop your WAV file here</p>
+                            <p class="text-sm text-gray-500">or click to browse</p>
+                        </div>
+                    </div>
+                    
+                    <div id="recordingStatus" class="hidden">
+                        <div class="recording-indicator">
+                            <i class="fas fa-circle text-accent animate-pulse"></i>
+                            Recording... Please speak now
+                        </div>
+                        <div id="waveform">
+                            <!-- Wave bars will be added here dynamically -->
+                        </div>
+                        <div class="mt-6">
+                            <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                <div id="recordingProgress" class="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="result" class="hidden">
+                        <div class="border-t border-gray-100 pt-8">
+                            <h2 class="text-2xl font-semibold text-center mb-6">Analysis Result</h2>
+                            <div class="emotion-card rounded-xl p-8 text-center">
+                                <div id="emotionIcon" class="emotion-icon"></div>
+                                <div class="space-y-4">
+                                    <p class="text-2xl">
+                                        Detected Emotion: <span id="emotion" class="font-bold text-primary"></span>
+                                    </p>
+                                    <div class="flex items-center justify-center space-x-2">
+                                        <span>Confidence:</span>
+                                        <span id="confidence" class="font-bold text-secondary"></span>
+                                    </div>
+                                    <div id="audioPlayer" class="mt-6">
+                                        <audio id="audioElement" class="audio-player" controls>
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div class="glass-card rounded-2xl p-8">
+                    <h2 class="text-2xl font-semibold mb-6">Recent Detections</h2>
+                    <div id="history" class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        <!-- History items will be added here dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle mr-3"></i>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        const recordButton = document.getElementById('recordButton');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const result = document.getElementById('result');
+        const emotion = document.getElementById('emotion');
+        const confidence = document.getElementById('confidence');
+        const history = document.getElementById('history');
+        const recordingProgress = document.getElementById('recordingProgress');
+        const emotionIcon = document.getElementById('emotionIcon');
+        const audioElement = document.getElementById('audioElement');
+        const waveform = document.getElementById('waveform');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let animationFrame = null;
+        let waveBars = [];
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingStream = null;
+
+        const emotionIcons = {
+            'neutral': '😐',
+            'calm': '😌',
+            'happy': '😊',
+            'sad': '😢',
+            'angry': '😠',
+            'fearful': '😨',
+            'disgust': '🤢',
+            'surprised': '😲'
+        };
+
+        // File upload handling
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'audio/wav') {
+                handleFileUpload(file);
+            } else {
+                alert('Please upload a WAV file.');
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFileUpload(file);
+            }
+        });
+
+        // Add toast notification function
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toast.className = `toast ${type}`;
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Enhance error handling
+        async function handleError(error, customMessage = null) {
+            console.error(error);
+            showToast(customMessage || error.message, 'error');
+            resetUI();
+        }
+
+        function resetUI() {
+            recordButton.disabled = false;
+            recordingStatus.classList.add('hidden');
+            updateRecordingProgress(0);
+            if (microphone) {
+                stopRecording();
+            }
+        }
+
+        // Enhance file upload handling
+        async function handleFileUpload(file) {
+            try {
+                showToast('Processing your audio file...', 'success');
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Emotion detected successfully!', 'success');
+                    updateResultUI(data);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                handleError(error, 'Error processing audio file. Please try again.');
+            }
+        }
+
+        function updateResultUI(data) {
+            emotion.textContent = data.emotion;
+            confidence.textContent = `${(data.confidence * 100).toFixed(1)}%`;
+            emotionIcon.textContent = emotionIcons[data.emotion];
+            result.classList.remove('hidden');
+            
+            audioElement.src = `/audio/${data.audio_file}`;
+            addToHistory(data.emotion, data.confidence, data.audio_file, data.timestamp);
+        }
+
+        // Enhance history item creation
+        function addToHistory(emotion, confidence, audioFile, timestamp) {
+            const historyItem = document.createElement('div');
+            historyItem.className = 'history-item glass-card rounded-xl p-4';
+            
+            const date = new Date(timestamp);
+            const timeString = date.toLocaleTimeString();
+            const dateString = date.toLocaleDateString();
+            
+            historyItem.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-3xl">${emotionIcons[emotion]}</span>
+                        <div>
+                            <div class="font-semibold text-lg">${emotion}</div>
+                            <div class="text-sm text-gray-500">${(confidence * 100).toFixed(1)}% confidence</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-gray-400 text-sm">${timeString}</div>
+                        <div class="text-gray-400 text-xs">${dateString}</div>
+                    </div>
+                </div>
+                <div class="flex justify-center mt-3">
+                    <button class="play-button text-white rounded-full p-3" onclick="playHistoryAudio('${audioFile}')">
+                        <i class="fas fa-play"></i>
+                    </button>
+                </div>
+            `;
+            
+            history.insertBefore(historyItem, history.firstChild);
+        }
+
+        // Add VAD configuration
+        const VAD_CONFIG = {
+            silenceThreshold: 0.015,
+            silenceDuration: 1000,
+            minRecordingDuration: 2000,
+            maxRecordingDuration: 10000,
+        };
+
+        let silenceStartTime = null;
+        let recordingStartTime = null;
+        let isRecording = false;
+        let recordingTimeout = null;
+
+        // Initialize audio context when the page loads
+        async function initializeAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+                
+                // Resume audio context on user interaction
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error initializing audio:', error);
+                return false;
+            }
+        }
+
+        // Update the record button click handler
+        recordButton.addEventListener('click', async () => {
+            try {
+                // Initialize audio context if not already done
+                if (!audioContext) {
+                    const initialized = await initializeAudio();
+                    if (!initialized) {
+                        throw new Error('Failed to initialize audio');
+                    }
+                }
+
+                // Resume audio context if it's suspended
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                if (isRecording) {
+                    stopRecordingAndProcess();
+                } else {
+                    recordButton.disabled = true;
+                    recordingStatus.classList.remove('hidden');
+                    result.classList.add('hidden');
+                    updateRecordingProgress(0);
+                    await startRecording();
+                }
+            } catch (error) {
+                handleError(error, 'Error starting recording. Please try again.');
+                resetUI();
+            }
+        });
+
+        async function startRecording() {
+            try {
+                // Request microphone access
+                recordingStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 16000,
+                        channelCount: 1
+                    } 
+                });
+
+                // Initialize audio context for visualization
+                if (!audioContext) {
+                    const initialized = await initializeAudio();
+                    if (!initialized) {
+                        throw new Error('Failed to initialize audio');
+                    }
+                }
+
+                // Create and connect audio nodes for visualization
+                microphone = audioContext.createMediaStreamSource(recordingStream);
+                microphone.connect(analyser);
+
+                // Initialize MediaRecorder
+                mediaRecorder = new MediaRecorder(recordingStream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                // Clear previous recording chunks
+                audioChunks = [];
+
+                // Handle data available event
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                // Start recording
+                mediaRecorder.start(100); // Collect data every 100ms
+                isRecording = true;
+                recordingStartTime = Date.now();
+                silenceStartTime = null;
+
+                // Start visualization
+                createWaveform();
+                checkAudioLevel();
+
+                // Update UI
+                recordButton.disabled = false;
+                recordButton.innerHTML = `
+                    <i class="fas fa-stop mr-3"></i>
+                    <span>Stop Recording</span>
+                `;
+                recordButton.classList.add('bg-accent', 'hover:bg-accent-dark');
+                recordButton.classList.remove('play-button');
+
+                showToast('Recording started... Speak now', 'success');
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                throw error;
+            }
+        }
+
+        function resetUI() {
+            recordButton.disabled = false;
+            recordingStatus.classList.add('hidden');
+            updateRecordingProgress(0);
+            isRecording = false;
+            silenceStartTime = null;
+            recordingStartTime = null;
+            
+            // Reset button appearance
+            recordButton.innerHTML = `
+                <i class="fas fa-microphone mr-3"></i>
+                <span>Start Recording</span>
+            `;
+            recordButton.classList.remove('bg-accent', 'hover:bg-accent-dark');
+            recordButton.classList.add('play-button');
+
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+                animationFrame = null;
+            }
+        }
+
+        // Update waveform visualization
+        function updateWaveform() {
+            if (!isRecording) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            for (let i = 0; i < waveBars.length; i++) {
+                const value = dataArray[i];
+                const height = (value / 255) * waveform.clientHeight;
+                waveBars[i].style.height = `${height}px`;
+            }
+
+            animationFrame = requestAnimationFrame(updateWaveform);
+        }
+
+        function getAverageVolume(dataArray) {
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            return sum / dataArray.length;
+        }
+
+        function checkAudioLevel() {
+            if (!isRecording) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            const averageVolume = getAverageVolume(dataArray) / 255; // Normalize to 0-1
+
+            // Update waveform visualization
+            updateWaveform();
+
+            // Check for silence
+            if (averageVolume < VAD_CONFIG.silenceThreshold) {
+                if (!silenceStartTime) {
+                    silenceStartTime = Date.now();
+                } else if (Date.now() - silenceStartTime > VAD_CONFIG.silenceDuration) {
+                    // Only stop if we've recorded for at least the minimum duration
+                    if (Date.now() - recordingStartTime > VAD_CONFIG.minRecordingDuration) {
+                        stopRecordingAndProcess();
+                    }
+                }
+            } else {
+                silenceStartTime = null;
+            }
+
+            // Check for maximum duration
+            if (Date.now() - recordingStartTime > VAD_CONFIG.maxRecordingDuration) {
+                stopRecordingAndProcess();
+            }
+
+            // Continue checking if still recording
+            if (isRecording) {
+                requestAnimationFrame(checkAudioLevel);
+            }
+        }
+
+        function createWaveform() {
+            waveform.innerHTML = '';
+            waveBars = [];
+            const barCount = 50;
+            const barWidth = waveform.clientWidth / barCount;
+
+            for (let i = 0; i < barCount; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'wave-bar';
+                bar.style.left = `${i * barWidth}px`;
+                bar.style.width = `${barWidth - 2}px`;
+                waveform.appendChild(bar);
+                waveBars.push(bar);
+            }
+        }
+
+        async function stopRecordingAndProcess() {
+            if (!isRecording) return;
+
+            isRecording = false;
+            if (recordingTimeout) {
+                clearTimeout(recordingTimeout);
+            }
+
+            try {
+                showToast('Processing your recording...', 'success');
+
+                // Stop the MediaRecorder
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+
+                // Wait for the last chunk of data
+                await new Promise(resolve => {
+                    mediaRecorder.onstop = resolve;
+                });
+
+                // Convert recorded chunks to a Blob
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+
+                // Convert to WAV format
+                const wavBlob = await convertToWav(audioBlob);
+
+                // Create form data and send to server
+                const formData = new FormData();
+                formData.append('audio', wavBlob, 'recording.wav');
+
+                const response = await fetch('/record', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Emotion detected successfully!', 'success');
+                    updateResultUI(data);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                handleError(error, 'Error processing recording. Please try again.');
+            } finally {
+                cleanupRecording();
+                resetUI();
+            }
+        }
+
+        async function convertToWav(webmBlob) {
+            // Create an audio context
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Read the blob as ArrayBuffer
+            const arrayBuffer = await webmBlob.arrayBuffer();
+            
+            // Decode the audio data
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Create a WAV file
+            const wavBuffer = audioBufferToWav(audioBuffer);
+            
+            // Create a new blob with the WAV data
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; // PCM
+            const bitDepth = 16;
+            
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+            
+            const dataLength = buffer.length * numChannels * bytesPerSample;
+            const bufferLength = 44 + dataLength;
+            
+            const arrayBuffer = new ArrayBuffer(bufferLength);
+            const view = new DataView(arrayBuffer);
+            
+            // RIFF identifier
+            writeString(view, 0, 'RIFF');
+            // RIFF chunk length
+            view.setUint32(4, 36 + dataLength, true);
+            // RIFF type
+            writeString(view, 8, 'WAVE');
+            // format chunk identifier
+            writeString(view, 12, 'fmt ');
+            // format chunk length
+            view.setUint32(16, 16, true);
+            // sample format (raw)
+            view.setUint16(20, format, true);
+            // channel count
+            view.setUint16(22, numChannels, true);
+            // sample rate
+            view.setUint32(24, sampleRate, true);
+            // byte rate (sample rate * block align)
+            view.setUint32(28, sampleRate * blockAlign, true);
+            // block align (channel count * bytes per sample)
+            view.setUint16(32, blockAlign, true);
+            // bits per sample
+            view.setUint16(34, bitDepth, true);
+            // data chunk identifier
+            writeString(view, 36, 'data');
+            // data chunk length
+            view.setUint32(40, dataLength, true);
+            
+            // Write the PCM samples
+            const offset = 44;
+            const channelData = [];
+            for (let i = 0; i < numChannels; i++) {
+                channelData.push(buffer.getChannelData(i));
+            }
+            
+            let pos = 0;
+            while (pos < buffer.length) {
+                for (let i = 0; i < numChannels; i++) {
+                    const sample = Math.max(-1, Math.min(1, channelData[i][pos]));
+                    const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(offset + (pos * blockAlign) + (i * bytesPerSample), value, true);
+                }
+                pos++;
+            }
+            
+            return arrayBuffer;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function cleanupRecording() {
+            if (mediaRecorder) {
+                if (mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+                mediaRecorder = null;
+            }
+            
+            if (recordingStream) {
+                recordingStream.getTracks().forEach(track => track.stop());
+                recordingStream = null;
+            }
+            
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+            
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+                animationFrame = null;
+            }
+            
+            audioChunks = [];
+        }
+
+        function updateRecordingProgress(progress) {
+            recordingProgress.style.width = `${progress}%`;
+        }
+
+        function playHistoryAudio(audioFile) {
+            audioElement.src = `/audio/${audioFile}`;
+            audioElement.play();
+        }
+
+        // Initialize audio on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Request microphone permission early
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    // Stop the stream immediately, we just needed the permission
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(error => {
+                    console.warn('Microphone permission not granted:', error);
+                });
+        });
+    </script>
+</body>
+</html> 
